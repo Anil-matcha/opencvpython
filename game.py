@@ -1,5 +1,11 @@
 import pygame, random, sys ,os,time
 from pygame.locals import *
+import cv2
+import numpy as np
+from time import sleep
+import thread
+import pyautogui
+import math
 
 WINDOWWIDTH = 800
 WINDOWHEIGHT = 600
@@ -13,6 +19,67 @@ BADDIEMAXSPEED = 8
 ADDNEWBADDIERATE = 6
 PLAYERMOVERATE = 5
 count=3
+
+cap = cv2.VideoCapture(0)
+prevx, prevy = 0,0
+factor = 5
+cap.set(3,396)
+cap.set(4,216)
+
+def gamecontrol(moveLeft, moveRight, moveUp, moveDown):
+    _, frame = cap.read()
+    frame = cv2.blur(frame,(3,3))
+
+    # Convert BGR to HSV
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # define range of blue color in HSV
+    lower_blue = np.array([110,50,50])
+    upper_blue = np.array([130,255,255])
+    thresh = cv2.inRange(hsv,lower_blue, upper_blue)
+    # Threshold the HSV image to get only blue colors
+    mask = cv2.inRange(hsv, lower_blue, upper_blue)
+    _,contours,hierarchy = cv2.findContours(thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    max_area = 0
+    best_cnt = None
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area > max_area:
+            max_area = area
+            best_cnt = cnt
+    #print(best_cnt, max_area)
+    M = cv2.moments(best_cnt)
+    divfactor = max_area/10000.0
+    if(divfactor < 1):
+        divfactor = 1
+    if(M['m00']>0 and max_area>100):
+        cx,cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
+        cv2.circle(frame,(cx,cy),5,255,-1)
+        #print(cx,cy)
+        if(cx>198):
+            moveRight = False
+            moveLeft = True
+        else:
+            moveLeft = False
+            moveRight = True
+        if(cy>108):
+            moveUp = False
+            moveDown = True
+        else:
+            moveDown = False
+            moveUp = True
+    else:
+        print("invisible")
+        #pyautogui.click()
+    # Bitwise-AND mask and original image
+    res = cv2.bitwise_and(frame,frame, mask= mask)
+    res = (255-res)
+    res=cv2.flip(res,1)
+    #cv2.imshow('frame',frame)
+    #cv2.imshow('mask',mask)
+    cv2.imshow('res',res)
+    return moveLeft, moveRight, moveUp, moveDown
+
 
 def terminate():
     pygame.quit()
@@ -92,12 +159,13 @@ while (count>0):
 
     while True: # the game loop
         score += 1 # increase score
-
+        moveLeft, moveRight, moveUp, moveDown = gamecontrol(moveLeft, moveRight, moveUp, moveDown)
+        #print(moveLeft, moveRight, moveUp, moveDown)
         for event in pygame.event.get():
             
             if event.type == QUIT:
                 terminate()
-
+            '''
             if event.type == KEYDOWN:
                 if event.key == ord('z'):
                     reverseCheat = True
@@ -137,7 +205,7 @@ while (count>0):
                     moveDown = False
 
             
-
+            '''
         # Add new baddies at the top of the screen
         if not reverseCheat and not slowCheat:
             baddieAddCounter += 1
